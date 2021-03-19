@@ -76,7 +76,7 @@ var duplicatedMessagesCmd = &cli.Command{
 	Name: "duplicate-messages",
 	Flags: []cli.Flag{
 		&cli.IntFlag{
-			Name: "target",
+			Name:     "target",
 			Required: true,
 		},
 	},
@@ -141,6 +141,11 @@ var duplicatedMessagesCmd = &cli.Command{
 					}
 
 					for _, m := range bms.SecpkMessages {
+						switch m.Message.Method {
+						case 0, 2, 3:
+						default:
+							continue
+						}
 						c, found := msgs[anonce(&m.Message)]
 						if found {
 							if c.c == m.Cid() {
@@ -157,6 +162,11 @@ var duplicatedMessagesCmd = &cli.Command{
 					}
 
 					for _, m := range bms.BlsMessages {
+						switch m.Method {
+						case 0, 2, 3:
+						default:
+							continue
+						}
 						c, found := msgs[anonce(m)]
 						if found {
 							if c.c == m.Cid() {
@@ -180,7 +190,7 @@ var duplicatedMessagesCmd = &cli.Command{
 				return err
 			}
 
-			if head.Height() % 2880 == 0 {
+			if head.Height()%2880 == 0 {
 				printLk.Lock()
 				fmt.Printf("H:%d; Ms: %d\n", head.Height(), mcount)
 				printLk.Unlock()
