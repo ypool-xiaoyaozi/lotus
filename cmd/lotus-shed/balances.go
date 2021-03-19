@@ -172,14 +172,14 @@ var duplicatedMessagesCmd = &cli.Command{
 					type Msg struct {
 						Cid    string
 						Value  string
-						Method abi.MethodNum
+						Method uint64
 					}
 					grouped := map[address.Address][]Msg{}
 					for c, m := range ms {
 						grouped[m.To] = append(grouped[m.To], Msg{
 							Cid:    c.String(),
 							Value:  types.FIL(m.Value).String(),
-							Method: m.Method,
+							Method: uint64(m.Method),
 						})
 					}
 					printLk.Lock()
