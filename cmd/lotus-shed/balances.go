@@ -135,20 +135,6 @@ var duplicatedMessagesCmd = &cli.Command{
 						return
 					}
 
-					for i, m := range bms.SecpkMessages {
-						switch m.Message.Method {
-						case 0, 2, 3:
-						default:
-							continue
-						}
-						c, ok := msgs[anonce(&m.Message)]
-						if !ok {
-							c = make(map[cid.Cid]*types.Message, 1)
-							msgs[anonce(&m.Message)] = c
-						}
-						c[bms.Cids[i]] = &m.Message
-					}
-
 					for i, m := range bms.BlsMessages {
 						switch m.Method {
 						case 0, 2, 3:
@@ -160,7 +146,21 @@ var duplicatedMessagesCmd = &cli.Command{
 							c = make(map[cid.Cid]*types.Message, 1)
 							msgs[anonce(m)] = c
 						}
-						c[bms.Cids[len(bms.BlsMessages)+i]] = m
+						c[bms.Cids[i]] = m
+					}
+
+					for i, m := range bms.SecpkMessages {
+						switch m.Message.Method {
+						case 0, 2, 3:
+						default:
+							continue
+						}
+						c, ok := msgs[anonce(&m.Message)]
+						if !ok {
+							c = make(map[cid.Cid]*types.Message, 1)
+							msgs[anonce(&m.Message)] = c
+						}
+						c[bms.Cids[len(bms.BlsMessages)+i]] = &m.Message
 					}
 				}
 				for _, ms := range msgs {
