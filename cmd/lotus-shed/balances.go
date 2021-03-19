@@ -76,7 +76,7 @@ var duplicatedMessagesCmd = &cli.Command{
 	Name: "duplicate-messages",
 	Flags: []cli.Flag{
 		&cli.IntFlag{
-			Name: "count",
+			Name: "target",
 			Required: true,
 		},
 	},
@@ -101,7 +101,9 @@ var duplicatedMessagesCmd = &cli.Command{
 
 		throttle := make(chan struct{}, threads)
 
-		for i := 0; i < cctx.Int("count"); i++ {
+		target := abi.ChainEpoch(cctx.Int("target"))
+
+		for target < head.Height() {
 			select {
 			case throttle <- struct{}{}:
 			case <-ctx.Done():
@@ -178,9 +180,9 @@ var duplicatedMessagesCmd = &cli.Command{
 				return err
 			}
 
-			if head.Height() % 20 == 0 {
+			if head.Height() % 2880 == 0 {
 				printLk.Lock()
-				//fmt.Printf("H:%d; Ms: %d\n", head.Height(), mcount)
+				fmt.Printf("H:%d; Ms: %d\n", head.Height(), mcount)
 				printLk.Unlock()
 			}
 		}
@@ -192,12 +194,11 @@ var duplicatedMessagesCmd = &cli.Command{
 				return ctx.Err()
 			}
 
-			if head.Height() % 20 == 0 {
-				printLk.Lock()
-				//fmt.Printf("finH:%d; Ms: %d\n", head.Height(), mcount)
-				printLk.Unlock()
-			}
 		}
+
+		printLk.Lock()
+		fmt.Printf("finH:%d; Ms: %d\n", head.Height(), mcount)
+		printLk.Unlock()
 
 		return nil
 	},
