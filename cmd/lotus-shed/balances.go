@@ -128,10 +128,12 @@ var duplicatedMessagesCmd = &cli.Command{
 
 				msgs := map[addrNonce]map[cid.Cid]*types.Message{}
 
+				encoder := json.NewEncoder(os.Stdout)
+
 				for _, bh := range ts.Blocks() {
 					bms, err := api.ChainGetBlockMessages(ctx, bh.Cid())
 					if err != nil {
-						fmt.Println("ERROR: ", err)
+						fmt.Fprintln(os.Stderr, "ERROR: ", err)
 						return
 					}
 
@@ -168,22 +170,23 @@ var duplicatedMessagesCmd = &cli.Command{
 						continue
 					}
 					type msg struct {
-						Cid    cid.Cid
-						Value  types.FIL
+						Cid    string
+						Value  string
 						Method abi.MethodNum
 					}
 					grouped := map[address.Address][]msg{}
 					for c, m := range ms {
 						grouped[m.To] = append(grouped[m.To], msg{
-							Cid:    c,
-							Value:  types.FIL(m.Value),
+							Cid:    c.String(),
+							Value:  types.FIL(m.Value).String(),
 							Method: m.Method,
 						})
 					}
 					printLk.Lock()
-					fmt.Printf("DUPE: (height:%d) ", ts.Height())
-					json.NewEncoder(os.Stdout).Encode(grouped)
-					fmt.Println("")
+					err := encoder.Encode(grouped)
+					if err != nil {
+						fmt.Fprintln(os.Stderr, "ERROR: ", err)
+					}
 					printLk.Unlock()
 				}
 			}(head)
@@ -194,7 +197,7 @@ var duplicatedMessagesCmd = &cli.Command{
 
 			if head.Height()%2880 == 0 {
 				printLk.Lock()
-				fmt.Printf("H:%d\n", head.Height())
+				fmt.Fprintln(os.Stderr, "H:", head.Height())
 				printLk.Unlock()
 			}
 		}
@@ -209,7 +212,7 @@ var duplicatedMessagesCmd = &cli.Command{
 		}
 
 		printLk.Lock()
-		fmt.Printf("H:%d\n", head.Height())
+		fmt.Fprintln(os.Stderr, "H:", head.Height())
 		printLk.Unlock()
 
 		return nil
