@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -97,7 +98,6 @@ var duplicatedMessagesCmd = &cli.Command{
 		var printLk sync.Mutex
 
 		threads := 64
-		mcount := 0
 
 		throttle := make(chan struct{}, threads)
 
@@ -126,12 +126,7 @@ var duplicatedMessagesCmd = &cli.Command{
 					}
 				}
 
-				type mc struct {
-					m abi.MethodNum
-					c cid.Cid
-				}
-
-				msgs := map[addrNonce]mc{}
+				msgs := map[addrNonce]map[cid.Cid]*types.Message{}
 
 				for _, bh := range ts.Blocks() {
 					bms, err := api.ChainGetBlockMessages(ctx, bh.Cid())
@@ -140,49 +135,56 @@ var duplicatedMessagesCmd = &cli.Command{
 						return
 					}
 
-					for _, m := range bms.SecpkMessages {
+					for i, m := range bms.SecpkMessages {
 						switch m.Message.Method {
 						case 0, 2, 3:
 						default:
 							continue
 						}
-						c, found := msgs[anonce(&m.Message)]
-						if found {
-							if c.c == m.Cid() {
-								continue
-							}
-							printLk.Lock()
-							fmt.Printf("DUPE: M:%d %s / %s ; val: %s\tto: %s\n", c.m, c.c, m.Message.Cid(), types.FIL(m.Message.Value), m.Message.To)
-							printLk.Unlock()
+						c, ok := msgs[anonce(&m.Message)]
+						if !ok {
+							c = make(map[cid.Cid]*types.Message, 1)
+							msgs[anonce(&m.Message)] = c
 						}
-						msgs[anonce(&m.Message)] = mc{
-							m: m.Message.Method,
-							c: m.Cid(),
-						}
+						c[bms.Cids[i]] = &m.Message
 					}
 
-					for _, m := range bms.BlsMessages {
+					for i, m := range bms.BlsMessages {
 						switch m.Method {
 						case 0, 2, 3:
 						default:
 							continue
 						}
-						c, found := msgs[anonce(m)]
-						if found {
-							if c.c == m.Cid() {
-								continue
-							}
-							printLk.Lock()
-							fmt.Printf("DUPE: M:%d %s / %s ; val: %s\tto: %s\n", c.m, c.c, m.Cid(), types.FIL(m.Value), m.To)
-							printLk.Unlock()
+						c, ok := msgs[anonce(m)]
+						if !ok {
+							c = make(map[cid.Cid]*types.Message, 1)
+							msgs[anonce(m)] = c
 						}
-						msgs[anonce(m)] = mc{
-							m: m.Method,
-							c: m.Cid(),
-						}
+						c[bms.Cids[len(bms.BlsMessages)+i]] = m
 					}
-
-					mcount += len(bms.SecpkMessages) + len(bms.BlsMessages)
+				}
+				for _, ms := range msgs {
+					if len(ms) == 1 {
+						continue
+					}
+					type msg struct {
+						Cid    cid.Cid
+						Value  types.FIL
+						Method abi.MethodNum
+					}
+					grouped := map[address.Address][]msg{}
+					for c, m := range ms {
+						grouped[m.To] = append(grouped[m.To], msg{
+							Cid:    c,
+							Value:  types.FIL(m.Value),
+							Method: m.Method,
+						})
+					}
+					printLk.Lock()
+					fmt.Printf("DUPE: (height:%d) ", ts.Height())
+					json.NewEncoder(os.Stdout).Encode(grouped)
+					fmt.Println("")
+					printLk.Unlock()
 				}
 			}(head)
 			head, err = api.ChainGetTipSet(ctx, head.Parents())
@@ -192,7 +194,7 @@ var duplicatedMessagesCmd = &cli.Command{
 
 			if head.Height()%2880 == 0 {
 				printLk.Lock()
-				fmt.Printf("H:%d; Ms: %d\n", head.Height(), mcount)
+				fmt.Printf("H:%d\n", head.Height())
 				printLk.Unlock()
 			}
 		}
@@ -207,7 +209,7 @@ var duplicatedMessagesCmd = &cli.Command{
 		}
 
 		printLk.Lock()
-		fmt.Printf("finH:%d; Ms: %d\n", head.Height(), mcount)
+		fmt.Printf("H:%d\n", head.Height())
 		printLk.Unlock()
 
 		return nil
