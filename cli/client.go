@@ -1166,7 +1166,7 @@ var clientRetrieveCmd = &cli.Command{
 					if prevStatus == retrievalmarket.DealStatusCompleted {
 						afmt.Println("Success")
 					} else {
-						afmt.Printf("saw final deal state %s instead of expected success state DealStatusCompleted",
+						afmt.Printf("saw final deal state %s instead of expected success state DealStatusCompleted\n",
 							retrievalmarket.DealStatuses[prevStatus])
 					}
 					return nil
