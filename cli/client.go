@@ -1143,6 +1143,8 @@ var clientRetrieveCmd = &cli.Command{
 			return xerrors.Errorf("error setting up retrieval: %w", err)
 		}
 
+		var prevStatus retrievalmarket.DealStatus
+
 		for {
 			select {
 			case evt, ok := <-updates:
@@ -1153,6 +1155,7 @@ var clientRetrieveCmd = &cli.Command{
 						retrievalmarket.ClientEvents[evt.Event],
 						retrievalmarket.DealStatuses[evt.Status],
 					)
+					prevStatus = evt.Status
 				}
 
 				if evt.Err != "" {
@@ -1160,10 +1163,11 @@ var clientRetrieveCmd = &cli.Command{
 				}
 
 				if !ok {
-					if evt.Status == retrievalmarket.DealStatusCompleted {
+					if prevStatus == retrievalmarket.DealStatusCompleted {
 						afmt.Println("Success")
 					} else {
-						afmt.Printf("saw final deal state %s instead of expected success state DealStatusCompleted", retrievalmarket.DealStatuses[evt.Status])
+						afmt.Printf("saw final deal state %s instead of expected success state DealStatusCompleted",
+							retrievalmarket.DealStatuses[prevStatus])
 					}
 					return nil
 				}
